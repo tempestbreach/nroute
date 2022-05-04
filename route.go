@@ -141,3 +141,9 @@ func (r *Route) BuildVarsFunc(f BuildVarsFunc) *Route {
 	}
 	return r
 }
+
+func(r *Route) Subrouter() *Router {
+    router := &Router{routeConf: copyRouteConf(r.routeConf)}
+    r.addMatcher(router)
+    return router
+}

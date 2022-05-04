@@ -142,6 +142,11 @@ func(r *Router) Path(subj string) *Route {
     return r.NewRoute().Path(subj)
 }
 
+func(r *Router) StrictDot(v bool) *Router {
+    r.strictDot = v
+    return r
+}
+
 type RouteMatch struct {
     Route       *Route
     Handler     augnats.Handler
@@ -173,4 +178,43 @@ func uniqueVars(s1, s2 []string) error {
 		}
 	}
 	return nil
+}
+
+type WalkFunc func(route *Route, router *Router, ancestors []*Route) error
+
+func(r *Router) Walk(walkFn WalkFunc) error {
+    return r.walk(walkFn, []*Route{})
+}
+
+var SkipRouter = errors.New("skip this router")
+
+func(r *Router) walk(walkFn WalkFunc, ancestors []*Route) error {
+    for _, t := range r.routes {
+        err := walkFn(t, r, ancestors)
+        if err == SkipRouter {
+            continue
+        }
+        if err != nil {
+            return err
+        }
+        for _, sr := range t.matchers {
+            if h, ok := sr.(*Router); ok {
+                ancestors = append(ancestors, t)
+                err := h.walk(walkFn, ancestors)
+                if err != nil {
+                    return err
+                }
+                ancestors = ancestors[:len(ancestors)-1]
+            }
+        }
+        if h, ok := t.handler.(*Router); ok {
+            ancestors = append(ancestors, t)
+            err := h.walk(walkFn, ancestors)
+            if err != nil {
+                return err
+            }
+            ancestors = ancestors[:len(ancestors)-1]
+        }
+    }
+    return nil
 }
